@@ -1,31 +1,77 @@
 "use client";
 
 import { useState } from "react";
-import GradientButton from "@/components/GradientButton";
+import { jsPDF } from "jspdf";
+
+type ConsultationResult = {
+  possibleCauses: string;
+  remedies: string;
+  lifestyle: string;
+  precautions: string;
+};
 
 export default function ConsultationPage() {
-  const [symptoms, setSymptoms] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [symptoms, setSymptoms] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<ConsultationResult | null>(null);
 
   const handleSubmit = () => {
-    if (!symptoms) return;
+    if (!symptoms.trim()) return;
 
     setLoading(true);
+    setResult(null);
 
-    // Fake AI delay simulation
     setTimeout(() => {
-      setResult({
-        possibleCauses: "Mild stress, dehydration, or lack of sleep.",
+      const newResult: ConsultationResult = {
+        possibleCauses:
+          "Your symptoms may be related to mild stress, dehydration, or lack of proper sleep.",
         remedies:
-          "Drink warm turmeric milk, stay hydrated, and maintain regular sleep.",
+          "Drink warm turmeric milk, stay hydrated, and ensure 7–8 hours of quality sleep.",
         lifestyle:
-          "Daily 20-minute walk, reduce screen time before sleep.",
+          "Include light daily exercise like walking and practice deep breathing for 10 minutes.",
         precautions:
-          "If symptoms persist more than 5 days, consult a physician.",
-      });
+          "If symptoms persist for more than 5 days or worsen, consult a medical professional.",
+      };
+
+      setResult(newResult);
+
+      // Save to localStorage
+      const previous = JSON.parse(
+        localStorage.getItem("consultations") || "[]"
+      );
+
+      localStorage.setItem(
+        "consultations",
+        JSON.stringify([
+          ...previous,
+          {
+            symptoms,
+            ...newResult,
+            date: new Date().toISOString(),
+          },
+        ])
+      );
+
       setLoading(false);
     }, 1500);
+  };
+
+  const downloadPDF = () => {
+    if (!result) return;
+
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("HolistiDoc AI - Health Summary", 20, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Symptoms: ${symptoms}`, 20, 40);
+    doc.text(`Possible Causes: ${result.possibleCauses}`, 20, 60);
+    doc.text(`Natural Remedies: ${result.remedies}`, 20, 80);
+    doc.text(`Lifestyle Suggestions: ${result.lifestyle}`, 20, 100);
+    doc.text(`Precautions: ${result.precautions}`, 20, 120);
+
+    doc.save("HolistiDoc_Health_Summary.pdf");
   };
 
   return (
@@ -38,7 +84,7 @@ export default function ConsultationPage() {
             AI Health Consultation
           </h1>
           <p className="text-gray-600">
-            Describe your symptoms for personalized holistic guidance.
+            Describe your symptoms to receive personalized holistic guidance.
           </p>
         </div>
 
@@ -51,7 +97,7 @@ export default function ConsultationPage() {
           <textarea
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="e.g. I've been feeling tired and having headaches..."
+            placeholder="e.g. I've been feeling tired and experiencing mild headaches..."
             className="w-full p-4 border border-gray-300 rounded-xl mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
             rows={4}
           />
@@ -59,7 +105,7 @@ export default function ConsultationPage() {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-8 py-3 rounded-full text-white font-medium"
+            className="px-8 py-3 rounded-full text-white font-medium transition disabled:opacity-70"
             style={{
               background: "linear-gradient(135deg,#2563eb,#14b8a6)",
             }}
@@ -76,24 +122,43 @@ export default function ConsultationPage() {
             </h2>
 
             <div>
-              <h3 className="font-semibold">Possible Causes</h3>
+              <h3 className="font-semibold text-blue-600">
+                Possible Causes
+              </h3>
               <p className="text-gray-600">{result.possibleCauses}</p>
             </div>
 
             <div>
-              <h3 className="font-semibold">Natural Remedies</h3>
+              <h3 className="font-semibold text-teal-600">
+                Natural Remedies
+              </h3>
               <p className="text-gray-600">{result.remedies}</p>
             </div>
 
             <div>
-              <h3 className="font-semibold">Lifestyle Suggestions</h3>
+              <h3 className="font-semibold text-blue-600">
+                Lifestyle Suggestions
+              </h3>
               <p className="text-gray-600">{result.lifestyle}</p>
             </div>
 
             <div>
-              <h3 className="font-semibold">Precautions</h3>
+              <h3 className="font-semibold text-teal-600">
+                Precautions
+              </h3>
               <p className="text-gray-600">{result.precautions}</p>
             </div>
+
+            {/* Download Button */}
+            <button
+              onClick={downloadPDF}
+              className="mt-6 px-6 py-3 rounded-full text-white font-medium"
+              style={{
+                background: "linear-gradient(135deg,#2563eb,#14b8a6)",
+              }}
+            >
+              Download Health Summary
+            </button>
           </div>
         )}
       </div>

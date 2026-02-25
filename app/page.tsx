@@ -1,65 +1,140 @@
-import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <>
+      {/* HERO SECTION */}
+      <section className="py-28 bg-[#f4f9ff]">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 items-center gap-16">
+
+          {/* LEFT SIDE */}
+          <div>
+            <span className="inline-block px-4 py-1 mb-6 text-sm rounded-full bg-blue-100 text-blue-700">
+              AI-Powered Holistic Health
+            </span>
+
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+              Your Personal{" "}
+              <span className="text-blue-600">AI</span>{" "}
+              <span className="text-teal-500">Health</span> Assistant
+            </h1>
+
+            <p className="text-gray-600 text-lg mb-8 max-w-xl">
+              Get comprehensive health guidance combining modern medicine,
+              natural remedies, diet advice, and yoga recommendations —
+              all powered by AI.
+            </p>
+
+            <div className="flex gap-4">
+              <Link
+                href="/consultation"
+                className="px-8 py-3 rounded-full text-white font-medium shadow-lg"
+                style={{
+                  background: "linear-gradient(135deg,#2563eb,#14b8a6)",
+                }}
+              >
+                Start Consultation →
+              </Link>
+
+              <Link
+                href="/about"
+                className="px-8 py-3 border border-gray-300 rounded-full font-medium text-gray-700 hover:bg-gray-100 transition"
+              >
+                Learn More
+              </Link>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE VISUAL */}
+          <div className="hidden md:flex justify-center items-center">
+            <div className="w-[420px] h-[420px] rounded-3xl bg-gradient-to-br from-blue-100 to-teal-100 shadow-xl flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-7xl mb-4">💙</div>
+                <p className="text-gray-500 text-sm">
+                  Smart AI Healthcare Interface
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* FEATURES SECTION */}
+      <section className="py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-6">
+
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold mb-4">
+              Holistic Health, Reimagined
+            </h2>
+            <p className="text-gray-600">
+              Comprehensive wellness guidance at your fingertips
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "AI-Powered Analysis",
+                desc: "Advanced AI analyzes your symptoms and provides comprehensive health guidance.",
+              },
+              {
+                title: "Natural Remedies",
+                desc: "Evidence-based natural remedies alongside modern medical recommendations.",
+              },
+              {
+                title: "Expert Attribution",
+                desc: "Every recommendation is attributed to a specialist area for transparency.",
+              },
+              {
+                title: "Yoga & Exercise",
+                desc: "Personalized exercise and yoga recommendations for your condition.",
+              },
+              {
+                title: "Community Feedback",
+                desc: "See how others benefited from similar recommendations.",
+              },
+              {
+                title: "Health Summaries",
+                desc: "Generate professional doctor-style health summary documents.",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition"
+              >
+                <h3 className="text-lg font-semibold mb-2">
+                  {item.title}
+                </h3>
+                <p className="text-gray-600 text-sm">
+                  {item.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* CTA SECTION */}
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-teal-500 text-white text-center">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-3xl font-bold mb-4">
+            Ready to Take Control of Your Health?
+          </h2>
+          <p className="mb-8 text-blue-100">
+            Start your free AI-powered health consultation today and get personalized holistic wellness recommendations.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+          <Link
+            href="/consultation"
+            className="px-8 py-3 bg-white text-blue-700 rounded-full font-medium shadow-lg"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            Get Started Free →
+          </Link>
         </div>
-      </main>
-    </div>
+      </section>
+    </>
   );
 }

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -13,13 +14,17 @@ export default function Navbar() {
           💙 HolistiDoc AI
         </Link>
 
-        {/* Desktop Menu */}
+        {/* Desktop */}
         <div className="hidden md:flex items-center gap-6">
-          <Link href="/">Home</Link>
-          <Link href="/consultation">Consultation</Link>
-          <Link href="/dashboard">Dashboard</Link>
-          <Link href="/about">About</Link>
-          <Link href="/contact">Contact</Link>
+          {["Home", "Consultation", "Dashboard", "About", "Contact"].map(
+            (item) => (
+              <motion.div whileHover={{ scale: 1.1 }} key={item}>
+                <Link href={`/${item === "Home" ? "" : item.toLowerCase()}`}>
+                  {item}
+                </Link>
+              </motion.div>
+            )
+          )}
 
           <Link
             href="/login"
@@ -32,12 +37,9 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile Icon */}
-        <button
-          className="md:hidden"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? <X /> : <Menu />}
+        {/* Mobile Button */}
+        <button className="md:hidden" onClick={() => setOpen(!open)}>
+          {open ? <X size={28} /> : <Menu size={28} />}
         </button>
       </div>
 

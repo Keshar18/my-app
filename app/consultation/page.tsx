@@ -1,164 +1,174 @@
 "use client";
 
 import { useState } from "react";
-import { jsPDF } from "jspdf";
-
-type ConsultationResult = {
-  possibleCauses: string;
-  remedies: string;
-  lifestyle: string;
-  precautions: string;
-};
 
 export default function ConsultationPage() {
-  const [symptoms, setSymptoms] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [result, setResult] = useState<ConsultationResult | null>(null);
+  const [symptoms, setSymptoms] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [showSummaryOption, setShowSummaryOption] = useState(false);
+  const [summaryGenerated, setSummaryGenerated] = useState(false);
 
-  const handleSubmit = () => {
+  const handleAnalyze = async () => {
     if (!symptoms.trim()) return;
 
     setLoading(true);
     setResult(null);
+    setSummaryGenerated(false);
+    setShowSummaryOption(false);
 
-    setTimeout(() => {
-      const newResult: ConsultationResult = {
-        possibleCauses:
-          "Your symptoms may be related to mild stress, dehydration, or lack of proper sleep.",
-        remedies:
-          "Drink warm turmeric milk, stay hydrated, and ensure 7–8 hours of quality sleep.",
-        lifestyle:
-          "Include light daily exercise like walking and practice deep breathing for 10 minutes.",
-        precautions:
-          "If symptoms persist for more than 5 days or worsen, consult a medical professional.",
-      };
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ symptoms }),
+      });
 
-      setResult(newResult);
+      const data = await response.json();
 
-      // Save to localStorage
-      const previous = JSON.parse(
-        localStorage.getItem("consultations") || "[]"
-      );
+      if (data.reply) {
+        const parsed = JSON.parse(data.reply);
+        setResult(parsed);
+        setShowSummaryOption(true);
+      } else {
+        setResult(null);
+      }
+    } catch (error) {
+      console.error(error);
+    }
 
-      localStorage.setItem(
-        "consultations",
-        JSON.stringify([
-          ...previous,
-          {
-            symptoms,
-            ...newResult,
-            date: new Date().toISOString(),
-          },
-        ])
-      );
-
-      setLoading(false);
-    }, 1500);
+    setLoading(false);
   };
 
-  const downloadPDF = () => {
+  const generateSummary = () => {
     if (!result) return;
 
-    const doc = new jsPDF();
+    const followUpDate = new Date();
+    followUpDate.setDate(
+      followUpDate.getDate() + Number(result.followUpDays || 7)
+    );
 
-    doc.setFontSize(16);
-    doc.text("HolistiDoc AI - Health Summary", 20, 20);
+    const summary = {
+      symptoms,
+      ...result,
+      consultationDate: new Date().toLocaleDateString(),
+      followUpDate: followUpDate.toLocaleDateString(),
+    };
 
-    doc.setFontSize(12);
-    doc.text(`Symptoms: ${symptoms}`, 20, 40);
-    doc.text(`Possible Causes: ${result.possibleCauses}`, 20, 60);
-    doc.text(`Natural Remedies: ${result.remedies}`, 20, 80);
-    doc.text(`Lifestyle Suggestions: ${result.lifestyle}`, 20, 100);
-    doc.text(`Precautions: ${result.precautions}`, 20, 120);
+    const existing =
+      JSON.parse(localStorage.getItem("consultations") || "[]");
 
-    doc.save("HolistiDoc_Health_Summary.pdf");
+    localStorage.setItem(
+      "consultations",
+      JSON.stringify([...existing, summary])
+    );
+
+    setSummaryGenerated(true);
+    setShowSummaryOption(false);
   };
 
   return (
     <section className="py-20 bg-[#f4f9ff] min-h-screen">
-      <div className="max-w-5xl mx-auto px-6">
+      <div className="max-w-4xl mx-auto px-6">
 
-        {/* Heading */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold mb-4">
-            AI Health Consultation
-          </h1>
-          <p className="text-gray-600">
-            Describe your symptoms to receive personalized holistic guidance.
-          </p>
-        </div>
+        <h1 className="text-3xl font-bold mb-8 text-center">
+          AI Health Consultation
+        </h1>
 
-        {/* Input Card */}
-        <div className="bg-white p-8 rounded-3xl shadow-lg mb-12">
-          <label className="block mb-3 font-medium">
-            Describe your symptoms
-          </label>
-
+        {/* Input */}
+        <div className="bg-white p-8 rounded-3xl shadow-lg mb-8">
           <textarea
             value={symptoms}
             onChange={(e) => setSymptoms(e.target.value)}
-            placeholder="e.g. I've been feeling tired and experiencing mild headaches..."
-            className="w-full p-4 border border-gray-300 rounded-xl mb-6 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-            rows={4}
+            placeholder="Describe your symptoms..."
+            className="w-full p-4 border rounded-xl mb-6 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            rows={5}
           />
 
           <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="px-8 py-3 rounded-full text-white font-medium transition disabled:opacity-70"
+            onClick={handleAnalyze}
+            className="w-full py-3 rounded-xl text-white"
             style={{
               background: "linear-gradient(135deg,#2563eb,#14b8a6)",
             }}
           >
-            {loading ? "Analyzing..." : "Get AI Health Guidance"}
+            {loading ? "Analyzing..." : "Analyze with AI Doctor"}
           </button>
         </div>
 
-        {/* Result Section */}
+        {/* AI Result */}
         {result && (
-          <div className="bg-white p-8 rounded-3xl shadow-lg space-y-6">
-            <h2 className="text-2xl font-semibold mb-4">
-              Your Health Guidance
+          <div className="bg-white p-8 rounded-3xl shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">
+              AI Doctor Analysis
             </h2>
 
-            <div>
-              <h3 className="font-semibold text-blue-600">
-                Possible Causes
-              </h3>
-              <p className="text-gray-600">{result.possibleCauses}</p>
-            </div>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-blue-600">
+                  Possible Causes
+                </h3>
+                <p>{result.possibleCauses}</p>
+              </div>
 
-            <div>
-              <h3 className="font-semibold text-teal-600">
-                Natural Remedies
-              </h3>
-              <p className="text-gray-600">{result.remedies}</p>
-            </div>
+              <div>
+                <h3 className="font-semibold text-teal-600">
+                  Natural Remedies
+                </h3>
+                <p>{result.naturalRemedies}</p>
+              </div>
 
-            <div>
-              <h3 className="font-semibold text-blue-600">
-                Lifestyle Suggestions
-              </h3>
-              <p className="text-gray-600">{result.lifestyle}</p>
-            </div>
+              <div>
+                <h3 className="font-semibold text-indigo-600">
+                  Lifestyle Advice
+                </h3>
+                <p>{result.lifestyleAdvice}</p>
+              </div>
 
-            <div>
-              <h3 className="font-semibold text-teal-600">
-                Precautions
-              </h3>
-              <p className="text-gray-600">{result.precautions}</p>
+              <div>
+                <h3 className="font-semibold text-red-600">
+                  Precautions
+                </h3>
+                <p>{result.precautions}</p>
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* Download Button */}
-            <button
-              onClick={downloadPDF}
-              className="mt-6 px-6 py-3 rounded-full text-white font-medium"
-              style={{
-                background: "linear-gradient(135deg,#2563eb,#14b8a6)",
-              }}
-            >
-              Download Health Summary
-            </button>
+        {/* Summary Option */}
+        {showSummaryOption && !summaryGenerated && (
+          <div className="bg-blue-50 p-6 rounded-2xl text-center mb-8">
+            <p className="mb-4 font-medium">
+              Would you like to generate a detailed health summary?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={generateSummary}
+                className="px-6 py-2 bg-green-500 text-white rounded-xl"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setShowSummaryOption(false)}
+                className="px-6 py-2 bg-gray-400 text-white rounded-xl"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Summary Generated */}
+        {summaryGenerated && (
+          <div className="bg-green-50 p-6 rounded-2xl text-center">
+            <p className="font-semibold text-green-700">
+              Health summary saved successfully.
+            </p>
+            <p className="text-sm mt-2">
+              You can view it in your Dashboard.
+            </p>
           </div>
         )}
       </div>

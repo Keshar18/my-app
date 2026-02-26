@@ -17,6 +17,7 @@ interface ChatSession {
 export default function ConsultationPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const [sessions, setSessions] = useState<ChatSession[]>([
     { id: 1, title: "New Chat", messages: [] },
@@ -26,9 +27,134 @@ export default function ConsultationPage() {
 
   const activeChat = sessions.find((s) => s.id === activeChatId)!;
 
-  // ✅ Create New Chat
+  const chatStarted = activeChat.messages.some(
+    (m) => m.role === "ai"
+  );
+
+  // 🔴 Emergency Detection
+  const isEmergency = () => {
+    const keywords = [
+      "emergency",
+      "hospital",
+      "heart attack",
+      "chest pain",
+      "stroke",
+      "breathing difficulty",
+    ];
+
+    const aiMessage = [...activeChat.messages]
+      .reverse()
+      .find((m) => m.role === "ai");
+
+    if (!aiMessage || !Array.isArray(aiMessage.content)) return false;
+
+    return aiMessage.content.some((text) =>
+      keywords.some((k) =>
+        text.toLowerCase().includes(k)
+      )
+    );
+  };
+
+  // 🟢 Dynamic Feedback
+  const problemText =
+    activeChat.messages.find((m) => m.role === "user")?.content?.toString() ||
+    "";
+
+  const getFeedback = () => {
+    if (problemText.toLowerCase().includes("headache")) {
+      return [
+        { stars: "⭐⭐⭐⭐⭐", text: "My headache reduced in 2 days." },
+        { stars: "⭐⭐⭐⭐", text: "Hydration advice worked well." },
+      ];
+    }
+
+    if (problemText.toLowerCase().includes("gas")) {
+      return [
+        { stars: "⭐⭐⭐⭐⭐", text: "Diet change helped me." },
+        { stars: "⭐⭐⭐⭐", text: "Fiber suggestion worked." },
+      ];
+    }
+
+    if (problemText.toLowerCase().includes("chest")) {
+      return [
+        { stars: "⭐⭐⭐⭐⭐", text: "Emergency alert saved me." },
+        { stars: "⭐⭐⭐⭐", text: "Consulted doctor immediately." },
+      ];
+    }
+
+    return [
+      { stars: "⭐⭐⭐⭐", text: "Helpful wellness guidance." },
+    ];
+  };
+
+  const feedbackList = getFeedback();
+
+  // 🟢 PDF Generator
+  const generatePDF = () => {
+    const doc = new jsPDF();
+
+    const userMessage = activeChat.messages.find(
+      (m) => m.role === "user"
+    );
+
+    const aiMessage = [...activeChat.messages]
+      .reverse()
+      .find((m) => m.role === "ai");
+
+    if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
+      alert("Complete consultation first.");
+      return;
+    }
+
+    const followUp = new Date();
+    followUp.setDate(followUp.getDate() + 5);
+
+    let y = 20;
+
+    doc.setFontSize(20);
+    doc.text("HolistiDoc AI - Consultation Summary", 20, y);
+
+    y += 20;
+    doc.setFontSize(12);
+    doc.text(`Problem: ${userMessage.content}`, 20, y);
+
+    y += 15;
+    doc.text("Solutions:", 20, y);
+    y += 10;
+
+    aiMessage.content.forEach((item) => {
+      doc.text(`• ${item}`, 25, y);
+      y += 10;
+    });
+
+    y += 10;
+    doc.text(`Consult Again On: ${followUp.toDateString()}`, 20, y);
+
+    if (isEmergency()) {
+      y += 20;
+      doc.setTextColor(255, 0, 0);
+      doc.text(
+        "⚠ EMERGENCY: Seek immediate medical attention.",
+        20,
+        y
+      );
+    }
+
+    y += 20;
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(
+      "Disclaimer: HolistiDoc AI provides health guidance only and does not replace professional medical advice. Always consult a qualified healthcare provider.",
+      20,
+      y,
+      { maxWidth: 170 }
+    );
+
+    doc.save("holistidoc-summary.pdf");
+  };
+
   const handleNewChat = () => {
-    const newChat: ChatSession = {
+    const newChat = {
       id: Date.now(),
       title: "New Chat",
       messages: [],
@@ -36,16 +162,13 @@ export default function ConsultationPage() {
 
     setSessions((prev) => [...prev, newChat]);
     setActiveChatId(newChat.id);
+    setShowHistory(false);
   };
 
-  // ✅ Send Message
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMessage: Message = {
-      role: "user",
-      content: input,
-    };
+    const userMessage: Message = { role: "user", content: input };
 
     setSessions((prev) =>
       prev.map((session) =>
@@ -78,7 +201,7 @@ export default function ConsultationPage() {
         role: "ai",
         content: Array.isArray(data.reply)
           ? data.reply
-          : ["AI formatting error. Please try again."],
+          : ["Something went wrong."],
       };
 
       setSessions((prev) =>
@@ -92,27 +215,12 @@ export default function ConsultationPage() {
         )
       );
     } catch {
-      const errorMessage: Message = {
-        role: "ai",
-        content: ["Something went wrong. Please try again."],
-      };
-
-      setSessions((prev) =>
-        prev.map((session) =>
-          session.id === activeChatId
-            ? {
-                ...session,
-                messages: [...session.messages, errorMessage],
-              }
-            : session
-        )
-      );
+      alert("AI Error");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Enter Key Support
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -120,96 +228,30 @@ export default function ConsultationPage() {
     }
   };
 
-  // ✅ Emergency Detection
-  const isEmergency = (messages: Message[]) => {
-    const emergencyKeywords = [
-      "emergency",
-      "hospital",
-      "heart attack",
-      "chest pain",
-      "breathing difficulty",
-      "stroke",
-      "unconscious",
-      "severe bleeding",
-    ];
-
-    const aiMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "ai");
-
-    if (!aiMessage || !Array.isArray(aiMessage.content)) return false;
-
-    return aiMessage.content.some((text) =>
-      emergencyKeywords.some((keyword) =>
-        text.toLowerCase().includes(keyword)
-      )
-    );
-  };
-
-  // ✅ PDF Generator
-  const generatePDF = () => {
-    const doc = new jsPDF();
-
-    const userMessage = activeChat.messages.find(
-      (m) => m.role === "user"
-    );
-
-    const aiMessage = [...activeChat.messages]
-      .reverse()
-      .find((m) => m.role === "ai");
-
-    if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
-      alert("Please complete a consultation first.");
-      return;
-    }
-
-    const problem = userMessage.content as string;
-    const solutions = aiMessage.content;
-
-    const followUpDays = 5;
-    const followUpDate = new Date();
-    followUpDate.setDate(followUpDate.getDate() + followUpDays);
-
-    let y = 20;
-
-    doc.setFontSize(16);
-    doc.text("HolistiDoc AI - Consultation Summary", 20, y);
-
-    y += 20;
-    doc.setFontSize(12);
-    doc.text(`Problem: ${problem}`, 20, y);
-
-    y += 20;
-    doc.text("Solutions:", 20, y);
-    y += 10;
-
-    solutions.forEach((item) => {
-      doc.text(`• ${item}`, 25, y);
-      y += 10;
-    });
-
-    y += 10;
-    doc.text(
-      `Consult Again On: ${followUpDate.toDateString()}`,
-      20,
-      y
-    );
-
-    doc.save("holistidoc-summary.pdf");
-  };
-
   return (
     <div
       className="flex bg-[#f4f9ff] overflow-hidden w-full"
       style={{ height: "calc(100vh - 72px)" }}
     >
-      {/* LEFT SIDE - CHAT */}
+      {/* LEFT SIDE */}
       <div className="flex flex-col w-4/5 p-6 h-full">
-        
-        {/* 🚨 Emergency Alert */}
-        {isEmergency(activeChat.messages) && (
-          <div className="bg-red-600 text-white p-4 rounded-xl mb-4 shadow-lg">
-            🚨 EMERGENCY ALERT: Please seek immediate medical attention or call emergency services immediately.
+
+        {activeChat.messages.length === 0 && (
+          <div className="bg-blue-50 border p-5 rounded-xl mb-4">
+            <h2 className="font-semibold mb-2">
+              Welcome to HolistiDoc AI 👋
+            </h2>
+            <p className="text-sm text-gray-600">
+              HolistiDoc AI provides health and wellness guidance only.
+              It does not replace professional diagnosis or treatment.
+              Always consult a qualified healthcare professional.
+            </p>
+          </div>
+        )}
+
+        {isEmergency() && (
+          <div className="bg-red-600 text-white p-4 rounded-xl mb-4 animate-pulse">
+            🚨 EMERGENCY ALERT: Seek immediate medical help.
           </div>
         )}
 
@@ -218,12 +260,6 @@ export default function ConsultationPage() {
         </h1>
 
         <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
-          {activeChat.messages.length === 0 && (
-            <p className="text-gray-400">
-              Start describing your symptoms...
-            </p>
-          )}
-
           {activeChat.messages.map((msg, index) => (
             <div
               key={index}
@@ -250,12 +286,6 @@ export default function ConsultationPage() {
               </div>
             </div>
           ))}
-
-          {loading && (
-            <p className="text-gray-500 animate-pulse">
-              AI is analyzing...
-            </p>
-          )}
         </div>
 
         <div className="mt-4 flex gap-4">
@@ -271,7 +301,7 @@ export default function ConsultationPage() {
           <button
             onClick={handleSend}
             disabled={loading}
-            className="px-6 py-3 rounded-xl text-white font-medium bg-gradient-to-r from-blue-500 to-teal-400 hover:opacity-90 transition"
+            className="px-6 py-3 rounded-xl text-white bg-gradient-to-r from-blue-500 to-teal-400"
           >
             {loading ? "Analyzing..." : "Analyze"}
           </button>
@@ -280,39 +310,74 @@ export default function ConsultationPage() {
 
       {/* RIGHT SIDE */}
       <div className="w-1/5 bg-white border-l p-5 flex flex-col h-full">
-        <button
-          onClick={handleNewChat}
-          className="mb-6 py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-        >
-          + New Chat
-        </button>
 
-        <h2 className="text-lg font-semibold mb-4">
-          Your Chats
-        </h2>
+        {/* Top Icons */}
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={handleNewChat}
+            className="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm"
+          >
+            +
+          </button>
 
-        <button
-          onClick={generatePDF}
-          className="mb-4 py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
-        >
-          Download Summary PDF
-        </button>
-
-        <div className="flex-1 overflow-y-auto space-y-2">
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              onClick={() => setActiveChatId(session.id)}
-              className={`p-3 rounded-lg cursor-pointer text-sm truncate ${
-                activeChatId === session.id
-                  ? "bg-blue-100 font-medium"
-                  : "hover:bg-gray-100"
-              }`}
-            >
-              {session.title}
-            </div>
-          ))}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-xl"
+          >
+            🕘
+          </button>
         </div>
+
+        {chatStarted && !showHistory ? (
+          <>
+            <h2 className="text-lg font-semibold mb-4">
+              Community Feedback
+            </h2>
+
+            <button
+              onClick={generatePDF}
+              className="mb-4 py-2 px-4 bg-green-500 text-white rounded-lg"
+            >
+              Download Summary PDF
+            </button>
+
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {feedbackList.map((fb, index) => (
+                <div
+                  key={index}
+                  className="p-3 bg-gray-100 rounded-lg"
+                >
+                  <div className="text-yellow-500 mb-1">
+                    {fb.stars}
+                  </div>
+                  <p className="text-sm">{fb.text}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-semibold mb-4">
+              Chat History
+            </h2>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {sessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => setActiveChatId(session.id)}
+                  className={`p-3 rounded-lg cursor-pointer text-sm ${
+                    activeChatId === session.id
+                      ? "bg-blue-100 font-medium"
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  {session.title}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

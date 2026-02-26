@@ -1,57 +1,59 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
   try {
     const { symptoms } = await req.json();
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!symptoms) {
+    if (!apiKey) {
       return NextResponse.json(
-        { error: "Symptoms are required." },
-        { status: 400 }
+        { reply: "API key missing." },
+        { status: 500 }
       );
     }
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are a professional AI doctor.\n\nUser symptoms: ${symptoms}`,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
 
-    const prompt = `
-You are a professional AI holistic healthcare assistant trained in general medicine and preventive healthcare.
+    const data = await response.json();
 
-Respond ONLY in valid JSON format:
+    console.log("Gemini response:", data);
 
-{
-  "possibleCauses": "",
-  "naturalRemedies": "",
-  "lifestyleAdvice": "",
-  "precautions": "",
-  "followUpDays": ""
-}
+    if (!response.ok) {
+      return NextResponse.json(
+        { reply: data.error?.message || "Gemini error." },
+        { status: 500 }
+      );
+    }
 
-Rules:
-- Do NOT prescribe strong medicines.
-- Encourage consulting real doctor if serious.
-- Keep tone professional and responsible.
-- followUpDays should be a number only.
-- Output ONLY valid JSON.
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response from AI.";
 
-User symptoms:
-${symptoms}
-`;
+    return NextResponse.json({ reply });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    return NextResponse.json({ reply: text });
-
-  } catch (error: any) {
-    console.error("GEMINI ERROR:", error);
+  } catch (error) {
+    console.error("Server error:", error);
     return NextResponse.json(
-      { error: error.message || "AI failed." },
+      { reply: "Server crashed." },
       { status: 500 }
     );
   }

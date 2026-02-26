@@ -1,15 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { symptoms } = await req.json();
-
-    if (!symptoms || symptoms.trim() === "") {
-      return NextResponse.json(
-        { reply: "Please describe your symptoms." },
-        { status: 400 }
-      );
-    }
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -18,12 +11,31 @@ export async function POST(req: Request) {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.1-8b-instant",
+        temperature: 0.6,
+        max_tokens: 400,
         messages: [
           {
             role: "system",
-            content:
-              "You are a helpful AI medical assistant. Give general advice but do not provide final diagnosis.",
+            content: `
+You are a professional medical assistant.
+
+IMPORTANT:
+- Return response ONLY in JSON format.
+- Format must be:
+
+{
+  "advice": [
+    "point 1",
+    "point 2",
+    "point 3"
+  ]
+}
+
+- Maximum 5 short bullet points.
+- No paragraphs.
+- No extra text outside JSON.
+            `,
           },
           {
             role: "user",
@@ -35,24 +47,26 @@ export async function POST(req: Request) {
 
     const data = await response.json();
 
-    console.log("Groq response:", data);
+    const aiText = data.choices?.[0]?.message?.content;
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { reply: data?.error?.message || "AI error occurred." },
-        { status: 500 }
-      );
+    let parsed;
+
+    try {
+      parsed = JSON.parse(aiText);
+    } catch {
+      return NextResponse.json({
+        reply: ["AI formatting error. Please try again."],
+      });
     }
 
-    const reply =
-      data?.choices?.[0]?.message?.content || "No response from AI.";
+    return NextResponse.json({
+      reply: parsed.advice,
+    });
 
-    return NextResponse.json({ reply });
   } catch (error) {
-    console.error("Server Error:", error);
-
+    console.error("Groq error:", error);
     return NextResponse.json(
-      { reply: "Something went wrong on the server." },
+      { reply: ["Something went wrong."] },
       { status: 500 }
     );
   }

@@ -1,9 +1,7 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export async function POST(req: Request) {
   try {
@@ -16,15 +14,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "system",
-          content: `
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+    });
+
+    const prompt = `
 You are a professional AI holistic healthcare assistant trained in general medicine and preventive healthcare.
 
-Provide structured response in JSON format:
+Respond ONLY in valid JSON format:
 
 {
   "possibleCauses": "",
@@ -36,28 +33,25 @@ Provide structured response in JSON format:
 
 Rules:
 - Do NOT prescribe strong medicines.
-- Avoid exact prescription dosages.
-- Always encourage consulting real doctor if symptoms are severe.
-- Include follow-up recommendation in days.
-- Be professional and medically responsible.
-`
-        },
-        {
-          role: "user",
-          content: symptoms
-        }
-      ],
-      temperature: 0.7,
-    });
+- Encourage consulting real doctor if serious.
+- Keep tone professional and responsible.
+- followUpDays should be a number only.
+- Output ONLY valid JSON.
 
-    const reply = completion.choices[0].message.content;
+User symptoms:
+${symptoms}
+`;
 
-    return NextResponse.json({ reply });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-  } catch (error) {
-    console.error(error);
+    return NextResponse.json({ reply: text });
+
+  } catch (error: any) {
+    console.error("GEMINI ERROR:", error);
     return NextResponse.json(
-      { error: "AI failed to respond." },
+      { error: error.message || "AI failed." },
       { status: 500 }
     );
   }

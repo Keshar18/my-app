@@ -24,7 +24,6 @@ export default function ConsultationPage() {
   ]);
 
   const [activeChatId, setActiveChatId] = useState(1);
-
   const activeChat = sessions.find((s) => s.id === activeChatId)!;
 
   const chatStarted = activeChat.messages.some(
@@ -67,36 +66,32 @@ export default function ConsultationPage() {
         { stars: "⭐⭐⭐⭐", text: "Hydration advice worked well." },
       ];
     }
-
     if (problemText.toLowerCase().includes("gas")) {
       return [
-        { stars: "⭐⭐⭐⭐⭐", text: "Diet change helped me." },
-        { stars: "⭐⭐⭐⭐", text: "Fiber suggestion worked." },
+        { stars: "⭐⭐⭐⭐⭐", text: "Diet change helped a lot." },
+        { stars: "⭐⭐⭐⭐", text: "Fiber suggestion was effective." },
       ];
     }
-
     if (problemText.toLowerCase().includes("chest")) {
       return [
         { stars: "⭐⭐⭐⭐⭐", text: "Emergency alert saved me." },
         { stars: "⭐⭐⭐⭐", text: "Consulted doctor immediately." },
       ];
     }
-
     return [
-      { stars: "⭐⭐⭐⭐", text: "Helpful wellness guidance." },
+      { stars: "⭐⭐⭐⭐", text: "Helpful general wellness guidance." },
     ];
   };
 
   const feedbackList = getFeedback();
 
-  // 🟢 PDF Generator
+  // 🎨 Beautiful PDF Generator
   const generatePDF = () => {
     const doc = new jsPDF();
 
     const userMessage = activeChat.messages.find(
       (m) => m.role === "user"
     );
-
     const aiMessage = [...activeChat.messages]
       .reverse()
       .find((m) => m.role === "ai");
@@ -106,51 +101,89 @@ export default function ConsultationPage() {
       return;
     }
 
+    const problem = userMessage.content as string;
+    const solutions = aiMessage.content;
+    const emergency = isEmergency();
+
     const followUp = new Date();
     followUp.setDate(followUp.getDate() + 5);
 
     let y = 20;
 
-    doc.setFontSize(20);
-    doc.text("HolistiDoc AI - Consultation Summary", 20, y);
+    // Header background
+    doc.setFillColor(230, 242, 255);
+    doc.rect(0, 0, 210, 45, "F");
 
-    y += 20;
-    doc.setFontSize(12);
-    doc.text(`Problem: ${userMessage.content}`, 20, y);
+    // Emergency small text
+    if (emergency) {
+      doc.setTextColor(200, 0, 0);
+      doc.setFontSize(10);
+      doc.text(
+        "⚠ Emergency Alert: Immediate medical consultation recommended.",
+        20,
+        y
+      );
+      y += 10;
+    }
 
-    y += 15;
-    doc.text("Solutions:", 20, y);
+    doc.setTextColor(0, 70, 150);
+    doc.setFontSize(22);
+    doc.text("HolistiDoc AI", 105, 30, { align: "center" });
+
+    doc.setFontSize(14);
+    doc.text("Consultation Summary", 105, 38, { align: "center" });
+
+    y = 65;
+
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("Your Reported Problem", 20, y);
+    y += 8;
+    doc.line(20, y, 190, y);
     y += 10;
 
-    aiMessage.content.forEach((item) => {
-      doc.text(`• ${item}`, 25, y);
+    doc.setFontSize(12);
+    doc.text(problem, 20, y, { maxWidth: 170 });
+
+    y += 20;
+
+    doc.setFontSize(14);
+    doc.text("Recommended Guidance", 20, y);
+    y += 8;
+    doc.line(20, y, 190, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    solutions.forEach((item) => {
+      doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
       y += 10;
     });
 
     y += 10;
-    doc.text(`Consult Again On: ${followUp.toDateString()}`, 20, y);
 
-    if (isEmergency()) {
-      y += 20;
-      doc.setTextColor(255, 0, 0);
-      doc.text(
-        "⚠ EMERGENCY: Seek immediate medical attention.",
-        20,
-        y
-      );
-    }
+    doc.setFontSize(14);
+    doc.text("Follow-Up Recommendation", 20, y);
+    y += 8;
+    doc.line(20, y, 190, y);
+    y += 10;
 
-    y += 20;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
+    doc.setFontSize(12);
     doc.text(
-      "Disclaimer: HolistiDoc AI provides health guidance only and does not replace professional medical advice. Always consult a qualified healthcare provider.",
+      `Suggested Follow-Up Date: ${followUp.toDateString()}`,
       20,
-      y,
+      y
+    );
+
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(
+      "HolistiDoc AI provides health and wellness guidance only. It does not replace professional medical diagnosis or treatment. Always consult a qualified healthcare professional.",
+      20,
+      280,
       { maxWidth: 170 }
     );
 
-    doc.save("holistidoc-summary.pdf");
+    doc.save("holistidoc-consultation.pdf");
   };
 
   const handleNewChat = () => {
@@ -159,7 +192,6 @@ export default function ConsultationPage() {
       title: "New Chat",
       messages: [],
     };
-
     setSessions((prev) => [...prev, newChat]);
     setActiveChatId(newChat.id);
     setShowHistory(false);
@@ -242,9 +274,7 @@ export default function ConsultationPage() {
               Welcome to HolistiDoc AI 👋
             </h2>
             <p className="text-sm text-gray-600">
-              HolistiDoc AI provides health and wellness guidance only.
-              It does not replace professional diagnosis or treatment.
-              Always consult a qualified healthcare professional.
+              HolistiDoc AI provides health guidance only and does not replace professional medical advice.
             </p>
           </div>
         )}
@@ -311,7 +341,6 @@ export default function ConsultationPage() {
       {/* RIGHT SIDE */}
       <div className="w-1/5 bg-white border-l p-5 flex flex-col h-full">
 
-        {/* Top Icons */}
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={handleNewChat}

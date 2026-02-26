@@ -3,57 +3,56 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const { symptoms } = await req.json();
-    const apiKey = process.env.GEMINI_API_KEY;
 
-    if (!apiKey) {
+    if (!symptoms || symptoms.trim() === "") {
       return NextResponse.json(
-        { reply: "API key missing." },
-        { status: 500 }
+        { reply: "Please describe your symptoms." },
+        { status: 400 }
       );
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are a professional AI doctor.\n\nUser symptoms: ${symptoms}`,
-                },
-              ],
-            },
-          ],
-        }),
-      }
-    );
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama3-8b-8192",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful AI medical assistant. Give general advice but do not provide final diagnosis.",
+          },
+          {
+            role: "user",
+            content: symptoms,
+          },
+        ],
+      }),
+    });
 
     const data = await response.json();
 
-    console.log("Gemini response:", data);
+    console.log("Groq response:", data);
 
     if (!response.ok) {
       return NextResponse.json(
-        { reply: data.error?.message || "Gemini error." },
+        { reply: data?.error?.message || "AI error occurred." },
         { status: 500 }
       );
     }
 
     const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response from AI.";
+      data?.choices?.[0]?.message?.content || "No response from AI.";
 
     return NextResponse.json({ reply });
-
   } catch (error) {
-    console.error("Server error:", error);
+    console.error("Server Error:", error);
+
     return NextResponse.json(
-      { reply: "Server crashed." },
+      { reply: "Something went wrong on the server." },
       { status: 500 }
     );
   }

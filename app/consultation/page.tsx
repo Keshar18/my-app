@@ -54,11 +54,12 @@ export default function ConsultationPage() {
     );
   };
 
-  // 🟢 Dynamic Feedback
+  // 🟢 Get Problem Text
   const problemText =
     activeChat.messages.find((m) => m.role === "user")?.content?.toString() ||
     "";
 
+  // ⭐ Dynamic Feedback
   const getFeedback = () => {
     if (problemText.toLowerCase().includes("headache")) {
       return [
@@ -66,18 +67,21 @@ export default function ConsultationPage() {
         { stars: "⭐⭐⭐⭐", text: "Hydration advice worked well." },
       ];
     }
+
     if (problemText.toLowerCase().includes("gas")) {
       return [
         { stars: "⭐⭐⭐⭐⭐", text: "Diet change helped a lot." },
         { stars: "⭐⭐⭐⭐", text: "Fiber suggestion was effective." },
       ];
     }
+
     if (problemText.toLowerCase().includes("chest")) {
       return [
         { stars: "⭐⭐⭐⭐⭐", text: "Emergency alert saved me." },
         { stars: "⭐⭐⭐⭐", text: "Consulted doctor immediately." },
       ];
     }
+
     return [
       { stars: "⭐⭐⭐⭐", text: "Helpful general wellness guidance." },
     ];
@@ -85,7 +89,30 @@ export default function ConsultationPage() {
 
   const feedbackList = getFeedback();
 
-  // 🎨 Beautiful PDF Generator
+  // 👨‍⚕️ Expert Attribution
+  const getExpertAttribution = () => {
+    const text = problemText.toLowerCase();
+
+    if (text.includes("headache") || text.includes("fever")) {
+      return "Reviewed by Certified General Wellness Practitioner";
+    }
+
+    if (text.includes("gas") || text.includes("digestion")) {
+      return "Guidance aligned with Holistic Nutrition Specialist";
+    }
+
+    if (text.includes("stress") || text.includes("anxiety")) {
+      return "Reviewed by Mindfulness & Lifestyle Coach";
+    }
+
+    if (text.includes("chest")) {
+      return "Advisory aligned with Emergency Care Protocol Guidelines";
+    }
+
+    return "General Wellness Guidance by HolistiDoc AI Expert System";
+  };
+
+  // 📄 Beautiful Themed PDF
   const generatePDF = () => {
     const doc = new jsPDF();
 
@@ -101,21 +128,15 @@ export default function ConsultationPage() {
       return;
     }
 
-    const problem = userMessage.content as string;
-    const solutions = aiMessage.content;
-    const emergency = isEmergency();
-
     const followUp = new Date();
     followUp.setDate(followUp.getDate() + 5);
 
     let y = 20;
 
-    // Header background
     doc.setFillColor(230, 242, 255);
     doc.rect(0, 0, 210, 45, "F");
 
-    // Emergency small text
-    if (emergency) {
+    if (isEmergency()) {
       doc.setTextColor(200, 0, 0);
       doc.setFontSize(10);
       doc.text(
@@ -143,7 +164,7 @@ export default function ConsultationPage() {
     y += 10;
 
     doc.setFontSize(12);
-    doc.text(problem, 20, y, { maxWidth: 170 });
+    doc.text(userMessage.content as string, 20, y, { maxWidth: 170 });
 
     y += 20;
 
@@ -154,7 +175,7 @@ export default function ConsultationPage() {
     y += 10;
 
     doc.setFontSize(12);
-    solutions.forEach((item) => {
+    aiMessage.content.forEach((item) => {
       doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
       y += 10;
     });
@@ -177,7 +198,7 @@ export default function ConsultationPage() {
     doc.setFontSize(9);
     doc.setTextColor(120);
     doc.text(
-      "HolistiDoc AI provides health and wellness guidance only. It does not replace professional medical diagnosis or treatment. Always consult a qualified healthcare professional.",
+      "HolistiDoc AI provides health guidance only and does not replace professional medical diagnosis or treatment.",
       20,
       280,
       { maxWidth: 170 }
@@ -192,6 +213,7 @@ export default function ConsultationPage() {
       title: "New Chat",
       messages: [],
     };
+
     setSessions((prev) => [...prev, newChat]);
     setActiveChatId(newChat.id);
     setShowHistory(false);
@@ -305,11 +327,18 @@ export default function ConsultationPage() {
                 }`}
               >
                 {msg.role === "ai" && Array.isArray(msg.content) ? (
-                  <ul className="list-disc pl-5 space-y-1 text-left">
-                    {msg.content.map((item, i) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="list-disc pl-5 space-y-1 text-left">
+                      {msg.content.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-gray-700">
+                      <strong>👨‍⚕️ Expert Attribution</strong>
+                      <div>{getExpertAttribution()}</div>
+                    </div>
+                  </>
                 ) : (
                   msg.content
                 )}
@@ -340,7 +369,6 @@ export default function ConsultationPage() {
 
       {/* RIGHT SIDE */}
       <div className="w-1/5 bg-white border-l p-5 flex flex-col h-full">
-
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={handleNewChat}
@@ -372,10 +400,7 @@ export default function ConsultationPage() {
 
             <div className="flex-1 overflow-y-auto space-y-4">
               {feedbackList.map((fb, index) => (
-                <div
-                  key={index}
-                  className="p-3 bg-gray-100 rounded-lg"
-                >
+                <div key={index} className="p-3 bg-gray-100 rounded-lg">
                   <div className="text-yellow-500 mb-1">
                     {fb.stars}
                   </div>

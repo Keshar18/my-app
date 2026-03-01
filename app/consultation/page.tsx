@@ -2,27 +2,30 @@
 
 import { useState } from "react";
 
-interface Message {
-  role: "user" | "ai";
-  content: string | string[];
-  isMedical?: boolean;
-}
-
 type ValidationStatus =
   | "AI_GENERATED"
   | "PENDING_REVIEW"
-  | "REVIEWED"
+  | "CLINICALLY_REVIEWED"
+  | "MODIFIED_BY_DOCTOR"
   | "ESCALATED";
 
 type RiskLevel = "LOW" | "MODERATE" | "HIGH";
+
+interface Message {
+  id: string;
+  role: "user" | "ai";
+  content: string | string[];
+  isMedical?: boolean;
+  riskLevel?: RiskLevel;
+  confidence?: number;
+  validationStatus?: ValidationStatus;
+  doctorModifiedResponse?: string;
+}
 
 interface ChatSession {
   id: number;
   title: string;
   messages: Message[];
-  status: ValidationStatus;
-  riskLevel: RiskLevel;
-  confidence: number;
 }
 
 export default function ConsultationPage() {
@@ -34,9 +37,6 @@ export default function ConsultationPage() {
       id: 1,
       title: "New Chat",
       messages: [],
-      status: "AI_GENERATED",
-      riskLevel: "LOW",
-      confidence: 0,
     },
   ]);
 
@@ -59,11 +59,10 @@ export default function ConsultationPage() {
       "injury",
       "stroke",
       "breathing",
+      "heart",
     ];
 
-    return medicalKeywords.some((word) =>
-      lower.includes(word)
-    );
+    return medicalKeywords.some((word) => lower.includes(word));
   };
 
   const calculateRisk = (text: string): RiskLevel => {
@@ -94,6 +93,55 @@ export default function ConsultationPage() {
   };
 
   // -------------------------
+  // PDF GENERATOR
+  // -------------------------
+  const generatePDF = () => {
+    if (!lastMedicalMessage) return;
+
+    const problem =
+      activeChat.messages.find((m) => m.role === "user")
+        ?.content || "";
+
+    const solutions = Array.isArray(
+      lastMedicalMessage.content
+    )
+      ? lastMedicalMessage.content
+      : [lastMedicalMessage.content];
+
+    const nextConsultDate = new Date();
+    nextConsultDate.setDate(
+      nextConsultDate.getDate() + 3
+    );
+
+    const html = `
+      <html>
+        <body style="font-family:Arial;padding:40px;">
+          <h1 style="color:#2563eb;">HolistiDoc AI Summary</h1>
+          <h3>Your Problem:</h3>
+          <p>${problem}</p>
+          <h3>Recommended Solutions:</h3>
+          <ul>
+            ${solutions
+              .map((s) => `<li>${s}</li>`)
+              .join("")}
+          </ul>
+          <p><strong>Consult Again On:</strong> ${nextConsultDate.toDateString()}</p>
+          ${
+            lastMedicalMessage.validationStatus ===
+            "ESCALATED"
+              ? `<p style="color:red;font-weight:bold;">Emergency Alert: Seek immediate medical help.</p>`
+              : ""
+          }
+        </body>
+      </html>
+    `;
+
+    const newWindow = window.open("");
+    newWindow?.document.write(html);
+    newWindow?.print();
+  };
+
+  // -------------------------
   // NEW CHAT
   // -------------------------
   const handleNewChat = () => {
@@ -101,9 +149,6 @@ export default function ConsultationPage() {
       id: Date.now(),
       title: "New Chat",
       messages: [],
-      status: "AI_GENERATED",
-      riskLevel: "LOW",
-      confidence: 0,
     };
 
     setSessions((prev) => [...prev, newChat]);
@@ -119,6 +164,7 @@ export default function ConsultationPage() {
     const userInput = input;
 
     const userMessage: Message = {
+      id: Date.now().toString(),
       role: "user",
       content: userInput,
     };
@@ -166,11 +212,15 @@ export default function ConsultationPage() {
       }
 
       const aiMessage: Message = {
+        id: Date.now().toString(),
         role: "ai",
         content: Array.isArray(data.reply)
           ? data.reply
           : [data.reply],
         isMedical,
+        riskLevel: isMedical ? riskLevel : undefined,
+        confidence: isMedical ? confidence : undefined,
+        validationStatus: isMedical ? status : undefined,
       };
 
       setSessions((prev) =>
@@ -179,9 +229,6 @@ export default function ConsultationPage() {
             ? {
                 ...session,
                 messages: [...session.messages, aiMessage],
-                riskLevel,
-                confidence,
-                status,
               }
             : session
         )
@@ -202,13 +249,18 @@ export default function ConsultationPage() {
     }
   };
 
+  const lastMedicalMessage = [...activeChat.messages]
+    .reverse()
+    .find((m) => m.role === "ai" && m.isMedical);
+
   return (
     <div
       className="relative flex bg-[#f4f9ff] w-full"
       style={{ height: "calc(100vh - 72px)" }}
     >
       {/* 🚨 EMERGENCY */}
-      {activeChat.status === "ESCALATED" && (
+      {lastMedicalMessage?.validationStatus ===
+        "ESCALATED" && (
         <div className="absolute top-0 left-0 w-full bg-red-600 text-white text-center py-3 font-semibold shadow-lg z-50">
           🚨 Emergency Alert: Seek Immediate Medical Help
         </div>
@@ -219,25 +271,26 @@ export default function ConsultationPage() {
           AI Health Consultation
         </h1>
 
-        {/* RISK PANEL */}
-        {activeChat.status !== "AI_GENERATED" && (
+        {/* TRANSPARENCY PANEL */}
+        {lastMedicalMessage && (
           <div className="mb-4 p-4 rounded-xl bg-gray-100 text-sm shadow">
             <div className="font-medium mb-1">
               🤖 AI Generated Preliminary Guidance
             </div>
-            <div>Risk Level: {activeChat.riskLevel}</div>
-            <div>Confidence: {activeChat.confidence}%</div>
-            <div className="mt-2 text-yellow-600 font-medium">
-              ⏳ Pending Clinical Review
+            <div>
+              Risk Level: {lastMedicalMessage.riskLevel}
+            </div>
+            <div>
+              Confidence: {lastMedicalMessage.confidence}%
             </div>
           </div>
         )}
 
         {/* CHAT */}
         <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
-          {activeChat.messages.map((msg, index) => (
+          {activeChat.messages.map((msg) => (
             <div
-              key={index}
+              key={msg.id}
               className={
                 msg.role === "user"
                   ? "text-right"
@@ -303,6 +356,16 @@ export default function ConsultationPage() {
           + New Chat
         </button>
 
+        {/* PDF BUTTON */}
+        {lastMedicalMessage && (
+          <button
+            onClick={generatePDF}
+            className="mb-4 py-2 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+          >
+            Download Summary PDF
+          </button>
+        )}
+
         <h2 className="text-lg font-semibold mb-4">
           Chat History
         </h2>
@@ -311,7 +374,9 @@ export default function ConsultationPage() {
           {sessions.map((session) => (
             <div
               key={session.id}
-              onClick={() => setActiveChatId(session.id)}
+              onClick={() =>
+                setActiveChatId(session.id)
+              }
               className={`p-3 rounded-lg cursor-pointer text-sm ${
                 activeChatId === session.id
                   ? "bg-blue-100 font-medium"
@@ -322,6 +387,29 @@ export default function ConsultationPage() {
             </div>
           ))}
         </div>
+
+        {/* COMMUNITY FEEDBACK */}
+        {lastMedicalMessage && (
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">
+              Community Feedback
+            </h3>
+
+            <div className="bg-gray-100 p-3 rounded-lg mb-2">
+              ⭐⭐⭐⭐⭐
+              <p className="text-sm">
+                Helped me understand my symptoms.
+              </p>
+            </div>
+
+            <div className="bg-gray-100 p-3 rounded-lg">
+              ⭐⭐⭐⭐☆
+              <p className="text-sm">
+                Clear recommendations provided.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

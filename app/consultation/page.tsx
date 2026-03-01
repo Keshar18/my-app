@@ -5,6 +5,7 @@ import { useState } from "react";
 interface Message {
   role: "user" | "ai";
   content: string | string[];
+  isMedical?: boolean;
 }
 
 type ValidationStatus =
@@ -40,12 +41,31 @@ export default function ConsultationPage() {
   ]);
 
   const [activeChatId, setActiveChatId] = useState(1);
-
   const activeChat = sessions.find((s) => s.id === activeChatId)!;
 
-  // -----------------------------
-  // 🔥 RISK SCORING
-  // -----------------------------
+  // -------------------------
+  // SMART MEDICAL DETECTION
+  // -------------------------
+  const detectMedical = (text: string) => {
+    const lower = text.toLowerCase();
+
+    const medicalKeywords = [
+      "pain",
+      "fever",
+      "infection",
+      "chest",
+      "headache",
+      "vomiting",
+      "injury",
+      "stroke",
+      "breathing",
+    ];
+
+    return medicalKeywords.some((word) =>
+      lower.includes(word)
+    );
+  };
+
   const calculateRisk = (text: string): RiskLevel => {
     const lower = text.toLowerCase();
 
@@ -54,33 +74,28 @@ export default function ConsultationPage() {
       lower.includes("stroke") ||
       lower.includes("heart attack") ||
       lower.includes("breathing difficulty")
-    ) {
+    )
       return "HIGH";
-    }
 
     if (
       lower.includes("fever") ||
       lower.includes("infection") ||
       lower.includes("severe pain")
-    ) {
+    )
       return "MODERATE";
-    }
 
     return "LOW";
   };
 
-  // -----------------------------
-  // 🔥 CONFIDENCE LOGIC
-  // -----------------------------
   const calculateConfidence = (risk: RiskLevel) => {
     if (risk === "HIGH") return 60;
     if (risk === "MODERATE") return 75;
     return 90;
   };
 
-  // -----------------------------
-  // 🆕 NEW CHAT
-  // -----------------------------
+  // -------------------------
+  // NEW CHAT
+  // -------------------------
   const handleNewChat = () => {
     const newChat: ChatSession = {
       id: Date.now(),
@@ -95,9 +110,9 @@ export default function ConsultationPage() {
     setActiveChatId(newChat.id);
   };
 
-  // -----------------------------
-  // 📤 SEND MESSAGE
-  // -----------------------------
+  // -------------------------
+  // SEND MESSAGE
+  // -------------------------
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -135,18 +150,28 @@ export default function ConsultationPage() {
 
       const data = await res.json();
 
+      const isMedical = detectMedical(userInput);
+
+      let riskLevel: RiskLevel = "LOW";
+      let confidence = 0;
+      let status: ValidationStatus = "AI_GENERATED";
+
+      if (isMedical) {
+        riskLevel = calculateRisk(userInput);
+        confidence = calculateConfidence(riskLevel);
+        status =
+          riskLevel === "HIGH"
+            ? "ESCALATED"
+            : "PENDING_REVIEW";
+      }
+
       const aiMessage: Message = {
         role: "ai",
         content: Array.isArray(data.reply)
           ? data.reply
-          : ["Something went wrong."],
+          : [data.reply],
+        isMedical,
       };
-
-      const risk = calculateRisk(userInput);
-      const confidence = calculateConfidence(risk);
-
-      let status: ValidationStatus = "PENDING_REVIEW";
-      if (risk === "HIGH") status = "ESCALATED";
 
       setSessions((prev) =>
         prev.map((session) =>
@@ -154,9 +179,9 @@ export default function ConsultationPage() {
             ? {
                 ...session,
                 messages: [...session.messages, aiMessage],
-                riskLevel: risk,
-                confidence: confidence,
-                status: status,
+                riskLevel,
+                confidence,
+                status,
               }
             : session
         )
@@ -182,71 +207,34 @@ export default function ConsultationPage() {
       className="relative flex bg-[#f4f9ff] w-full"
       style={{ height: "calc(100vh - 72px)" }}
     >
-      {/* 🚨 FULL WIDTH EMERGENCY BANNER */}
+      {/* 🚨 EMERGENCY */}
       {activeChat.status === "ESCALATED" && (
         <div className="absolute top-0 left-0 w-full bg-red-600 text-white text-center py-3 font-semibold shadow-lg z-50">
-          🚨 EMERGENCY ALERT: High-risk symptoms detected.
-          Please seek immediate medical attention.
+          🚨 Emergency Alert: Seek Immediate Medical Help
         </div>
       )}
 
-      {/* LEFT CHAT AREA */}
       <div className="flex flex-col w-4/5 p-6 h-full">
         <h1 className="text-3xl font-bold mb-4">
           AI Health Consultation
         </h1>
 
-        {/* VALIDATION PANEL */}
-        <div className="mb-4 p-4 rounded-xl bg-gray-100 text-sm shadow">
-          <div className="font-medium mb-1">
-            🤖 AI Generated Preliminary Guidance
-          </div>
-          <div>Risk Level: {activeChat.riskLevel}</div>
-          <div>Confidence: {activeChat.confidence}%</div>
-
-          <div className="mt-2">
-            {activeChat.status === "ESCALATED" ? (
-              <div className="text-red-600 font-semibold">
-                🚨 Escalated – Immediate Medical Attention Recommended
-              </div>
-            ) : activeChat.status === "PENDING_REVIEW" ? (
-              <div className="text-yellow-600 font-medium">
-                ⏳ Pending Clinical Review
-              </div>
-            ) : activeChat.status === "REVIEWED" ? (
-              <div className="text-green-600 font-medium">
-                ✔ Clinically Reviewed
-              </div>
-            ) : (
-              <div className="text-gray-600">
-                🤖 AI Generated
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* CHAT BOX */}
-        <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
-          {activeChat.messages.length === 0 && (
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-sm text-gray-700 space-y-2">
-              <p className="font-medium text-blue-700">
-                Welcome to HolistiDoc AI
-              </p>
-              <p>
-                HolistiDoc AI provides informational and wellness guidance only.
-                It does NOT replace professional medical diagnosis,
-                treatment, or consultation.
-              </p>
-              <p>
-                Always consult a qualified healthcare professional
-                for serious, persistent, or emergency symptoms.
-              </p>
-              <p className="text-gray-400 mt-2">
-                Start describing your symptoms below.
-              </p>
+        {/* RISK PANEL */}
+        {activeChat.status !== "AI_GENERATED" && (
+          <div className="mb-4 p-4 rounded-xl bg-gray-100 text-sm shadow">
+            <div className="font-medium mb-1">
+              🤖 AI Generated Preliminary Guidance
             </div>
-          )}
+            <div>Risk Level: {activeChat.riskLevel}</div>
+            <div>Confidence: {activeChat.confidence}%</div>
+            <div className="mt-2 text-yellow-600 font-medium">
+              ⏳ Pending Clinical Review
+            </div>
+          </div>
+        )}
 
+        {/* CHAT */}
+        <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
           {activeChat.messages.map((msg, index) => (
             <div
               key={index}
@@ -264,6 +252,7 @@ export default function ConsultationPage() {
                 }`}
               >
                 {msg.role === "ai" &&
+                msg.isMedical &&
                 Array.isArray(msg.content) ? (
                   <ul className="list-disc pl-5 space-y-1 text-left">
                     {msg.content.map((item, i) => (
@@ -305,7 +294,7 @@ export default function ConsultationPage() {
         </div>
       </div>
 
-      {/* RIGHT CHAT HISTORY */}
+      {/* RIGHT SIDE */}
       <div className="w-1/5 bg-white border-l p-5 flex flex-col h-full">
         <button
           onClick={handleNewChat}

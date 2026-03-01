@@ -101,12 +101,13 @@ export default function ConsultationPage() {
   const handleSend = async () => {
     if (!input.trim()) return;
 
+    const userInput = input;
+
     const userMessage: Message = {
       role: "user",
-      content: input,
+      content: userInput,
     };
 
-    // Add user message immediately
     setSessions((prev) =>
       prev.map((session) =>
         session.id === activeChatId
@@ -114,7 +115,7 @@ export default function ConsultationPage() {
               ...session,
               title:
                 session.messages.length === 0
-                  ? input.slice(0, 20)
+                  ? userInput.slice(0, 20)
                   : session.title,
               messages: [...session.messages, userMessage],
             }
@@ -122,9 +123,8 @@ export default function ConsultationPage() {
       )
     );
 
-    setLoading(true);
-    const userInput = input;
     setInput("");
+    setLoading(true);
 
     try {
       const res = await fetch("/api/analyze", {
@@ -142,15 +142,11 @@ export default function ConsultationPage() {
           : ["Something went wrong."],
       };
 
-      // 🔥 Calculate risk & confidence
       const risk = calculateRisk(userInput);
       const confidence = calculateConfidence(risk);
 
       let status: ValidationStatus = "PENDING_REVIEW";
-
-      if (risk === "HIGH") {
-        status = "ESCALATED";
-      }
+      if (risk === "HIGH") status = "ESCALATED";
 
       setSessions((prev) =>
         prev.map((session) =>
@@ -172,9 +168,6 @@ export default function ConsultationPage() {
     }
   };
 
-  // -----------------------------
-  // ⌨ ENTER KEY SUPPORT
-  // -----------------------------
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLTextAreaElement>
   ) => {
@@ -186,40 +179,72 @@ export default function ConsultationPage() {
 
   return (
     <div
-      className="flex bg-[#f4f9ff] w-full"
+      className="relative flex bg-[#f4f9ff] w-full"
       style={{ height: "calc(100vh - 72px)" }}
     >
+      {/* 🚨 FULL WIDTH EMERGENCY BANNER */}
+      {activeChat.status === "ESCALATED" && (
+        <div className="absolute top-0 left-0 w-full bg-red-600 text-white text-center py-3 font-semibold shadow-lg z-50">
+          🚨 EMERGENCY ALERT: High-risk symptoms detected.
+          Please seek immediate medical attention.
+        </div>
+      )}
+
       {/* LEFT CHAT AREA */}
       <div className="flex flex-col w-4/5 p-6 h-full">
         <h1 className="text-3xl font-bold mb-4">
           AI Health Consultation
         </h1>
 
-        {/* 🔥 VALIDATION PANEL */}
+        {/* VALIDATION PANEL */}
         <div className="mb-4 p-4 rounded-xl bg-gray-100 text-sm shadow">
           <div className="font-medium mb-1">
             🤖 AI Generated Preliminary Guidance
           </div>
           <div>Risk Level: {activeChat.riskLevel}</div>
           <div>Confidence: {activeChat.confidence}%</div>
-          <div>
-            Status:{" "}
-            {activeChat.status === "ESCALATED"
-              ? "🚨 Escalated - Immediate Medical Attention Recommended"
-              : activeChat.status === "PENDING_REVIEW"
-              ? "⏳ Pending Clinical Review"
-              : activeChat.status === "REVIEWED"
-              ? "✔ Clinically Reviewed"
-              : "AI Generated"}
+
+          <div className="mt-2">
+            {activeChat.status === "ESCALATED" ? (
+              <div className="text-red-600 font-semibold">
+                🚨 Escalated – Immediate Medical Attention Recommended
+              </div>
+            ) : activeChat.status === "PENDING_REVIEW" ? (
+              <div className="text-yellow-600 font-medium">
+                ⏳ Pending Clinical Review
+              </div>
+            ) : activeChat.status === "REVIEWED" ? (
+              <div className="text-green-600 font-medium">
+                ✔ Clinically Reviewed
+              </div>
+            ) : (
+              <div className="text-gray-600">
+                🤖 AI Generated
+              </div>
+            )}
           </div>
         </div>
 
         {/* CHAT BOX */}
         <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
           {activeChat.messages.length === 0 && (
-            <p className="text-gray-400">
-              Start describing your symptoms...
-            </p>
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl text-sm text-gray-700 space-y-2">
+              <p className="font-medium text-blue-700">
+                Welcome to HolistiDoc AI
+              </p>
+              <p>
+                HolistiDoc AI provides informational and wellness guidance only.
+                It does NOT replace professional medical diagnosis,
+                treatment, or consultation.
+              </p>
+              <p>
+                Always consult a qualified healthcare professional
+                for serious, persistent, or emergency symptoms.
+              </p>
+              <p className="text-gray-400 mt-2">
+                Start describing your symptoms below.
+              </p>
+            </div>
           )}
 
           {activeChat.messages.map((msg, index) => (

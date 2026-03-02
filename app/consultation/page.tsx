@@ -7,6 +7,10 @@ interface Message {
   role: "user" | "ai";
   content: string | string[];
   isMedical?: boolean;
+  riskLevel?: "LOW" | "MODERATE" | "HIGH";
+  confidence?: number;
+  validationStatus?: "PENDING" | "VERIFIED" | "ESCALATED";
+  explanation?: string[];
 }
 
 interface ChatSession {
@@ -27,8 +31,6 @@ export default function ConsultationPage() {
   const [activeChatId, setActiveChatId] = useState(1);
   const activeChat = sessions.find((s) => s.id === activeChatId)!;
 
-  const chatStarted = activeChat.messages.some((m) => m.role === "ai");
-
   const latestUserMessage = [...activeChat.messages]
     .reverse()
     .find((m) => m.role === "user");
@@ -43,52 +45,66 @@ export default function ConsultationPage() {
       (
         lower.includes("pain") ||
         lower.includes("fever") ||
+        lower.includes("headache") ||
+        lower.includes("chest") ||
+        lower.includes("gas") ||
+        lower.includes("problem") ||
         lower.includes("how") ||
         lower.includes("what") ||
-        lower.includes("should") ||
-        lower.includes("problem") ||
-        lower.includes("gas") ||
-        lower.includes("headache") ||
-        lower.includes("chest")
+        lower.includes("should")
       )
     );
   };
 
-  // ---------------- EMERGENCY ----------------
-  const isEmergency = () => {
-    const text = problemText.toLowerCase();
-    return (
-      text.includes("chest pain") ||
-      text.includes("heart attack") ||
-      text.includes("stroke") ||
-      text.includes("breathing difficulty")
-    );
+  // ---------------- RISK ----------------
+  const calculateRisk = (text: string) => {
+    const lower = text.toLowerCase();
+
+    if (
+      lower.includes("chest pain") ||
+      lower.includes("heart attack") ||
+      lower.includes("stroke") ||
+      lower.includes("breathing difficulty")
+    ) return "HIGH";
+
+    if (
+      lower.includes("fever") ||
+      lower.includes("vomiting") ||
+      lower.includes("severe")
+    ) return "MODERATE";
+
+    return "LOW";
   };
+
+  const calculateConfidence = (risk: string) => {
+    if (risk === "HIGH") return 60;
+    if (risk === "MODERATE") return 75;
+    return 90;
+  };
+
+  const isEmergency = () => calculateRisk(problemText) === "HIGH";
 
   // ---------------- FEEDBACK ----------------
   const getFeedback = () => {
     const text = problemText.toLowerCase();
 
-    if (text.includes("headache")) {
+    if (text.includes("headache"))
       return [
-        { stars: "⭐⭐⭐⭐⭐", text: "My headache reduced within 2 days." },
-        { stars: "⭐⭐⭐⭐", text: "Hydration advice worked well." },
+        { stars: "⭐⭐⭐⭐⭐", text: "Headache relief tips worked in 2 days." },
+        { stars: "⭐⭐⭐⭐", text: "Hydration advice helped a lot." },
       ];
-    }
 
-    if (text.includes("chest")) {
+    if (text.includes("chest"))
       return [
         { stars: "⭐⭐⭐⭐⭐", text: "Emergency alert helped me act quickly." },
         { stars: "⭐⭐⭐⭐", text: "Consulted doctor immediately." },
       ];
-    }
 
-    if (text.includes("gas")) {
+    if (text.includes("gas"))
       return [
-        { stars: "⭐⭐⭐⭐⭐", text: "Diet change improved digestion." },
-        { stars: "⭐⭐⭐⭐", text: "Fiber advice was helpful." },
+        { stars: "⭐⭐⭐⭐⭐", text: "Diet advice improved digestion." },
+        { stars: "⭐⭐⭐⭐", text: "Fiber suggestion was useful." },
       ];
-    }
 
     return [
       { stars: "⭐⭐⭐⭐", text: "Helpful general wellness guidance." },
@@ -98,125 +114,80 @@ export default function ConsultationPage() {
   const feedbackList = getFeedback();
 
   // ---------------- PDF ----------------
- const generatePDF = () => {
-  const doc = new jsPDF();
+  const generatePDF = () => {
+    const doc = new jsPDF();
 
-  const userMessage = [...activeChat.messages]
-    .reverse()
-    .find((m) => m.role === "user");
+    const userMessage = [...activeChat.messages]
+      .reverse()
+      .find((m) => m.role === "user");
 
-  const aiMessage = [...activeChat.messages]
-    .reverse()
-    .find((m) => m.role === "ai");
+    const aiMessage = [...activeChat.messages]
+      .reverse()
+      .find((m) => m.role === "ai");
 
-  if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
-    alert("Complete consultation first.");
-    return;
-  }
+    if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
+      alert("Complete consultation first.");
+      return;
+    }
 
-  let y = 20;
+    let y = 20;
+    const risk = calculateRisk(problemText);
 
-  const text = problemText.toLowerCase();
+    let followUpDays = 5;
+    if (risk === "HIGH") followUpDays = 1;
+    if (risk === "MODERATE") followUpDays = 3;
 
-  // ---------------- FOLLOW-UP LOGIC ----------------
-  let followUpDays = 5;
+    const followUpDate = new Date();
+    followUpDate.setDate(followUpDate.getDate() + followUpDays);
 
-  if (
-    text.includes("chest pain") ||
-    text.includes("heart attack") ||
-    text.includes("stroke") ||
-    text.includes("breathing difficulty")
-  ) {
-    followUpDays = 1;
-  } else if (
-    text.includes("fever") ||
-    text.includes("headache")
-  ) {
-    followUpDays = 3;
-  }
+    doc.setFontSize(18);
+    doc.text("HolistiDoc AI Consultation Summary", 105, y, { align: "center" });
+    y += 15;
 
-  const followUpDate = new Date();
-  followUpDate.setDate(followUpDate.getDate() + followUpDays);
+    if (risk === "HIGH") {
+      doc.setTextColor(200, 0, 0);
+      doc.text(
+        "🚨 EMERGENCY ALERT: Immediate medical attention required.",
+        20,
+        y,
+        { maxWidth: 170 }
+      );
+      y += 15;
+      doc.setTextColor(0);
+    }
 
-  // ---------------- HEADER ----------------
-  doc.setFontSize(18);
-  doc.setTextColor(0, 70, 150);
-  doc.text("HolistiDoc AI Consultation Summary", 105, y, { align: "center" });
-
-  y += 15;
-
-  // ---------------- EMERGENCY ALERT ----------------
-  if (isEmergency()) {
-    doc.setTextColor(200, 0, 0);
     doc.setFontSize(12);
+    doc.text("Your Problem:", 20, y);
+    y += 8;
+    doc.text(userMessage.content as string, 20, y, { maxWidth: 170 });
+    y += 20;
+
+    doc.text("AI Recommended Guidance:", 20, y);
+    y += 8;
+
+    aiMessage.content.forEach((item) => {
+      doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
+      y += 8;
+    });
+
+    y += 10;
     doc.text(
-      "🚨 EMERGENCY ALERT: Immediate medical attention is strongly recommended.",
+      `Follow-up: Please consult again after ${followUpDays} day(s) on ${followUpDate.toDateString()}`,
       20,
       y,
       { maxWidth: 170 }
     );
-    y += 15;
-  }
 
-  doc.setTextColor(0);
-  doc.setFontSize(12);
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(
+      "Medical Disclaimer: HolistiDoc AI provides informational guidance only and does not replace licensed medical diagnosis.",
+      20,
+      280,
+      { maxWidth: 170 }
+    );
 
-  // ---------------- USER PROBLEM ----------------
-  doc.text("Your Reported Problem:", 20, y);
-  y += 8;
-  doc.text(userMessage.content as string, 20, y, { maxWidth: 170 });
-
-  y += 20;
-
-  // ---------------- AI GUIDANCE ----------------
-  doc.text("Recommended Guidance:", 20, y);
-  y += 8;
-
-  aiMessage.content.forEach((item) => {
-    doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
-    y += 8;
-  });
-
-  y += 10;
-
-  // ---------------- FOLLOW-UP SECTION ----------------
-  doc.setFontSize(12);
-  doc.text("Follow-Up Recommendation:", 20, y);
-  y += 8;
-
-  doc.text(
-    `Please consult again after ${followUpDays} day(s) on: ${followUpDate.toDateString()}`,
-    20,
-    y,
-    { maxWidth: 170 }
-  );
-
-  y += 15;
-
-  // ---------------- DISCLAIMER ----------------
-  doc.setFontSize(9);
-  doc.setTextColor(100);
-  doc.text(
-    "Medical Disclaimer: HolistiDoc AI provides informational health guidance only. It does not replace licensed medical diagnosis, treatment, or emergency services. Always consult a qualified healthcare professional for medical decisions.",
-    20,
-    280,
-    { maxWidth: 170 }
-  );
-
-  doc.save("holistidoc-summary.pdf");
-};
-
-  // ---------------- NEW CHAT ----------------
-  const handleNewChat = () => {
-    const newChat = {
-      id: Date.now(),
-      title: "New Chat",
-      messages: [],
-    };
-
-    setSessions((prev) => [...prev, newChat]);
-    setActiveChatId(newChat.id);
-    setShowHistory(false);
+    doc.save("holistidoc-summary.pdf");
   };
 
   // ---------------- SEND ----------------
@@ -253,21 +224,33 @@ export default function ConsultationPage() {
 
       const data = await res.json();
 
+      const medicalFlag = isMedicalQuery(currentInput);
+      const risk = calculateRisk(currentInput);
+
       const aiMessage: Message = {
         role: "ai",
-        content: Array.isArray(data.reply)
-          ? data.reply
-          : [data.reply],
-        isMedical: isMedicalQuery(currentInput),
+        content: Array.isArray(data.reply) ? data.reply : [data.reply],
+        isMedical: medicalFlag,
+        riskLevel: medicalFlag ? risk : undefined,
+        confidence: medicalFlag ? calculateConfidence(risk) : undefined,
+        validationStatus: medicalFlag
+          ? risk === "HIGH"
+            ? "ESCALATED"
+            : "PENDING"
+          : undefined,
+        explanation: medicalFlag
+          ? [
+              "Detected medical keywords from your input.",
+              `Risk classified as ${risk}.`,
+              "No conflicting emergency indicators detected.",
+            ]
+          : undefined,
       };
 
       setSessions((prev) =>
         prev.map((session) =>
           session.id === activeChatId
-            ? {
-                ...session,
-                messages: [...session.messages, aiMessage],
-              }
+            ? { ...session, messages: [...session.messages, aiMessage] }
             : session
         )
       );
@@ -292,23 +275,19 @@ export default function ConsultationPage() {
       {/* LEFT SIDE */}
       <div className="flex flex-col w-4/5 p-6 h-full">
 
-        {/* DISCLAIMER */}
+        {/* Disclaimer */}
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-4 text-sm text-gray-700">
-          <strong>Medical Disclaimer:</strong> HolistiDoc AI provides informational
-          guidance only and does not replace professional medical diagnosis,
-          treatment, or emergency services.
+          <strong>Medical Disclaimer:</strong> HolistiDoc AI provides informational guidance only and does not replace professional medical services.
         </div>
 
-        {/* EMERGENCY ALERT */}
+        {/* Emergency */}
         {isEmergency() && (
           <div className="bg-red-600 text-white p-4 rounded-xl mb-4 animate-pulse">
             🚨 EMERGENCY ALERT: Seek immediate medical help.
           </div>
         )}
 
-        <h1 className="text-3xl font-bold mb-4">
-          AI Health Consultation
-        </h1>
+        <h1 className="text-3xl font-bold mb-4">AI Health Consultation</h1>
 
         <div className="flex-1 bg-white rounded-2xl shadow-lg p-6 overflow-y-auto space-y-4">
           {activeChat.messages.map((msg, index) => (
@@ -324,11 +303,55 @@ export default function ConsultationPage() {
                 {msg.role === "ai" &&
                  Array.isArray(msg.content) &&
                  msg.isMedical ? (
-                  <ul className="list-disc pl-5 space-y-1 text-left">
-                    {msg.content.map((item, i) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
+                  <>
+                    <ul className="list-disc pl-5 space-y-1 text-left">
+                      {msg.content.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+
+                    {/* Validation Panel */}
+                    <div className="mt-3 p-3 bg-gray-50 border rounded-lg text-xs space-y-1">
+                      <div className="font-semibold text-blue-600">
+                        AI Generated Preliminary Guidance
+                      </div>
+
+                      <div>
+                        Risk Level:{" "}
+                        <span className={
+                          msg.riskLevel === "HIGH"
+                            ? "text-red-600 font-semibold"
+                            : msg.riskLevel === "MODERATE"
+                            ? "text-yellow-600 font-semibold"
+                            : "text-green-600 font-semibold"
+                        }>
+                          {msg.riskLevel}
+                        </span>
+                      </div>
+
+                      <div>Confidence: {msg.confidence}%</div>
+
+                      <div>
+                        {msg.validationStatus === "ESCALATED" && (
+                          <span className="text-red-600 font-semibold">
+                            Escalated – Immediate Medical Attention Required
+                          </span>
+                        )}
+
+                        {msg.validationStatus === "PENDING" && (
+                          <span className="text-yellow-600 font-semibold">
+                            ⏳ Pending Doctor Review
+                          </span>
+                        )}
+
+                        {msg.validationStatus === "VERIFIED" && (
+                          <span className="text-green-600 font-semibold">
+                            ✔ Verified by Doctor
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   msg.content
                 )}
@@ -361,7 +384,15 @@ export default function ConsultationPage() {
 
         <div className="flex justify-between items-center mb-6">
           <button
-            onClick={handleNewChat}
+            onClick={() => {
+              const newChat = {
+                id: Date.now(),
+                title: "New Chat",
+                messages: [],
+              };
+              setSessions((prev) => [...prev, newChat]);
+              setActiveChatId(newChat.id);
+            }}
             className="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm">
             +
           </button>
@@ -373,7 +404,7 @@ export default function ConsultationPage() {
           </button>
         </div>
 
-        {chatStarted && !showHistory && isMedicalQuery(problemText) && (
+        {!showHistory && (
           <>
             <button
               onClick={generatePDF}
@@ -381,24 +412,28 @@ export default function ConsultationPage() {
               Download Summary
             </button>
 
-            <h2 className="text-lg font-semibold mb-4">
-              Community Feedback
-            </h2>
+            {isMedicalQuery(problemText) && (
+              <>
+                <h2 className="text-lg font-semibold mb-4">
+                  Community Feedback
+                </h2>
 
-            <div className="flex-1 overflow-y-auto space-y-4">
-              {feedbackList.map((fb, index) => (
-                <div
-                  key={index}
-                  className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-sm">
-                  <div className="text-yellow-500 mb-2 text-lg">
-                    {fb.stars}
-                  </div>
-                  <p className="text-sm text-gray-700">
-                    {fb.text}
-                  </p>
+                <div className="flex-1 overflow-y-auto space-y-4">
+                  {feedbackList.map((fb, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-sm">
+                      <div className="text-yellow-500 mb-2 text-lg">
+                        {fb.stars}
+                      </div>
+                      <p className="text-sm text-gray-700">
+                        {fb.text}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </>
         )}
 

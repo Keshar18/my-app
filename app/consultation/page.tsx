@@ -6,7 +6,7 @@ import jsPDF from "jspdf";
 interface Message {
   role: "user" | "ai";
   content: string | string[];
-  isMedical?: boolean; // per-message bullet control
+  isMedical?: boolean;
 }
 
 interface ChatSession {
@@ -19,7 +19,6 @@ export default function ConsultationPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [consultationRating, setConsultationRating] = useState<number | null>(null);
 
   const [sessions, setSessions] = useState<ChatSession[]>([
     { id: 1, title: "New Chat", messages: [] },
@@ -30,11 +29,9 @@ export default function ConsultationPage() {
 
   const chatStarted = activeChat.messages.some((m) => m.role === "ai");
 
-  // Always get latest user message
-  const latestUserMessage =
-    [...activeChat.messages]
-      .reverse()
-      .find((m) => m.role === "user");
+  const latestUserMessage = [...activeChat.messages]
+    .reverse()
+    .find((m) => m.role === "user");
 
   const problemText = latestUserMessage?.content?.toString() || "";
 
@@ -101,54 +98,113 @@ export default function ConsultationPage() {
   const feedbackList = getFeedback();
 
   // ---------------- PDF ----------------
-  const generatePDF = () => {
-    const doc = new jsPDF();
+ const generatePDF = () => {
+  const doc = new jsPDF();
 
-    const userMessage = [...activeChat.messages]
-      .reverse()
-      .find((m) => m.role === "user");
+  const userMessage = [...activeChat.messages]
+    .reverse()
+    .find((m) => m.role === "user");
 
-    const aiMessage = [...activeChat.messages]
-      .reverse()
-      .find((m) => m.role === "ai");
+  const aiMessage = [...activeChat.messages]
+    .reverse()
+    .find((m) => m.role === "ai");
 
-    if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
-      alert("Complete consultation first.");
-      return;
-    }
+  if (!userMessage || !aiMessage || !Array.isArray(aiMessage.content)) {
+    alert("Complete consultation first.");
+    return;
+  }
 
-    let y = 20;
+  let y = 20;
 
-    doc.setFontSize(18);
-    doc.text("HolistiDoc AI Consultation Summary", 105, y, { align: "center" });
+  const text = problemText.toLowerCase();
 
-    y += 15;
+  // ---------------- FOLLOW-UP LOGIC ----------------
+  let followUpDays = 5;
 
+  if (
+    text.includes("chest pain") ||
+    text.includes("heart attack") ||
+    text.includes("stroke") ||
+    text.includes("breathing difficulty")
+  ) {
+    followUpDays = 1;
+  } else if (
+    text.includes("fever") ||
+    text.includes("headache")
+  ) {
+    followUpDays = 3;
+  }
+
+  const followUpDate = new Date();
+  followUpDate.setDate(followUpDate.getDate() + followUpDays);
+
+  // ---------------- HEADER ----------------
+  doc.setFontSize(18);
+  doc.setTextColor(0, 70, 150);
+  doc.text("HolistiDoc AI Consultation Summary", 105, y, { align: "center" });
+
+  y += 15;
+
+  // ---------------- EMERGENCY ALERT ----------------
+  if (isEmergency()) {
+    doc.setTextColor(200, 0, 0);
     doc.setFontSize(12);
-    doc.text("Your Reported Problem:", 20, y);
-    y += 8;
-    doc.text(userMessage.content as string, 20, y, { maxWidth: 170 });
-
-    y += 20;
-
-    doc.text("Recommended Guidance:", 20, y);
-    y += 8;
-
-    aiMessage.content.forEach((item) => {
-      doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
-      y += 8;
-    });
-
-    doc.setFontSize(9);
     doc.text(
-      "HolistiDoc AI provides informational guidance only and does not replace professional medical diagnosis.",
+      "🚨 EMERGENCY ALERT: Immediate medical attention is strongly recommended.",
       20,
-      280,
+      y,
       { maxWidth: 170 }
     );
+    y += 15;
+  }
 
-    doc.save("holistidoc-summary.pdf");
-  };
+  doc.setTextColor(0);
+  doc.setFontSize(12);
+
+  // ---------------- USER PROBLEM ----------------
+  doc.text("Your Reported Problem:", 20, y);
+  y += 8;
+  doc.text(userMessage.content as string, 20, y, { maxWidth: 170 });
+
+  y += 20;
+
+  // ---------------- AI GUIDANCE ----------------
+  doc.text("Recommended Guidance:", 20, y);
+  y += 8;
+
+  aiMessage.content.forEach((item) => {
+    doc.text(`• ${item}`, 25, y, { maxWidth: 165 });
+    y += 8;
+  });
+
+  y += 10;
+
+  // ---------------- FOLLOW-UP SECTION ----------------
+  doc.setFontSize(12);
+  doc.text("Follow-Up Recommendation:", 20, y);
+  y += 8;
+
+  doc.text(
+    `Please consult again after ${followUpDays} day(s) on: ${followUpDate.toDateString()}`,
+    20,
+    y,
+    { maxWidth: 170 }
+  );
+
+  y += 15;
+
+  // ---------------- DISCLAIMER ----------------
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(
+    "Medical Disclaimer: HolistiDoc AI provides informational health guidance only. It does not replace licensed medical diagnosis, treatment, or emergency services. Always consult a qualified healthcare professional for medical decisions.",
+    20,
+    280,
+    { maxWidth: 170 }
+  );
+
+  doc.save("holistidoc-summary.pdf");
+};
 
   // ---------------- NEW CHAT ----------------
   const handleNewChat = () => {
@@ -160,7 +216,6 @@ export default function ConsultationPage() {
 
     setSessions((prev) => [...prev, newChat]);
     setActiveChatId(newChat.id);
-    setConsultationRating(null);
     setShowHistory(false);
   };
 
@@ -237,7 +292,7 @@ export default function ConsultationPage() {
       {/* LEFT SIDE */}
       <div className="flex flex-col w-4/5 p-6 h-full">
 
-        {/* DISCLAIMER (Always Visible) */}
+        {/* DISCLAIMER */}
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-4 text-sm text-gray-700">
           <strong>Medical Disclaimer:</strong> HolistiDoc AI provides informational
           guidance only and does not replace professional medical diagnosis,
@@ -313,37 +368,17 @@ export default function ConsultationPage() {
 
           <button
             onClick={() => setShowHistory(!showHistory)}
-            className="text-xl">
-            🕘
+            className="text-2xl font-bold">
+            ☰
           </button>
         </div>
 
         {chatStarted && !showHistory && isMedicalQuery(problemText) && (
           <>
-            <div className="mb-6">
-              <h3 className="font-semibold mb-2 text-sm">
-                ⭐ Rate This Consultation
-              </h3>
-              <div className="flex gap-1">
-                {[1,2,3,4,5].map((star) => (
-                  <span
-                    key={star}
-                    onClick={() => setConsultationRating(star)}
-                    className={`cursor-pointer text-xl ${
-                      consultationRating && consultationRating >= star
-                        ? "text-yellow-500"
-                        : "text-gray-300"
-                    }`}>
-                    ★
-                  </span>
-                ))}
-              </div>
-            </div>
-
             <button
               onClick={generatePDF}
-              className="mb-4 py-2 px-4 bg-green-500 text-white rounded-lg">
-              Download Summary PDF
+              className="mb-6 py-3 px-4 rounded-xl text-white bg-gradient-to-r from-blue-500 to-teal-400 shadow">
+              Download Summary
             </button>
 
             <h2 className="text-lg font-semibold mb-4">
@@ -352,9 +387,15 @@ export default function ConsultationPage() {
 
             <div className="flex-1 overflow-y-auto space-y-4">
               {feedbackList.map((fb, index) => (
-                <div key={index} className="p-3 bg-gray-100 rounded-lg">
-                  <div className="text-yellow-500 mb-1">{fb.stars}</div>
-                  <p className="text-sm">{fb.text}</p>
+                <div
+                  key={index}
+                  className="p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-sm">
+                  <div className="text-yellow-500 mb-2 text-lg">
+                    {fb.stars}
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    {fb.text}
+                  </p>
                 </div>
               ))}
             </div>

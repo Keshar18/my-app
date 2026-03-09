@@ -226,7 +226,7 @@ function StatCard({ title, value }: { title: string; value: number }) {
         {title}
       </p>
       <h2 className="text-2xl font-bold text-gray-800">
-        
+        {value}
       </h2>
     </div>
   );
